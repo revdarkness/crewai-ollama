@@ -16,12 +16,12 @@ from email.header import decode_header
 class GmailIMAPClient:
     """Gmail IMAP client for reading trigger emails."""
 
-    # Command patterns
+    # Command patterns - REQUIRE [TA] or [TA-TRIGGERS] prefix to avoid false positives
     COMMAND_PATTERNS = {
-        "add_nudge": re.compile(r"ADD\s+NUDGE:\s*(.+)", re.IGNORECASE),
-        "add_milestone": re.compile(r"ADD\s+MILESTONE:\s*(.+)", re.IGNORECASE),
-        "note": re.compile(r"NOTE:\s*(.+)", re.IGNORECASE),
-        "today": re.compile(r"TODAY\??", re.IGNORECASE),
+        "add_nudge": re.compile(r"\[TA(?:-TRIGGERS)?\]\s*(?:ADD\s+)?NUDGE:\s*(.+)", re.IGNORECASE),
+        "add_milestone": re.compile(r"\[TA(?:-TRIGGERS)?\]\s*(?:ADD\s+)?MILESTONE:\s*(.+)", re.IGNORECASE),
+        "note": re.compile(r"\[TA(?:-TRIGGERS)?\]\s*NOTE:\s*(.+)", re.IGNORECASE),
+        "today": re.compile(r"\[TA(?:-TRIGGERS)?\]\s*TODAY\??", re.IGNORECASE),
     }
 
     def __init__(
@@ -81,25 +81,18 @@ class GmailIMAPClient:
 
     def get_unread_triggers(self) -> List[Dict[str, Any]]:
         """
-        Get unread emails from the trigger label.
+        Get unread emails from INBOX with [TA] prefix in subject.
 
         Returns:
             List of email dictionaries with parsed commands
         """
         self._ensure_connected()
 
-        # Select the label/folder
-        # Gmail labels are accessed as folders with the label name
-        try:
-            status, _ = self._connection.select(f'"{self.label}"')
-            if status != "OK":
-                # Try with INBOX and search by label
-                self._connection.select("INBOX")
-        except:
-            self._connection.select("INBOX")
+        # Always search INBOX for [TA] emails (more reliable than label-based)
+        self._connection.select("INBOX")
 
-        # Search for unread messages
-        status, messages = self._connection.search(None, "UNSEEN")
+        # Search for unread emails with [TA] in subject
+        status, messages = self._connection.search(None, '(UNSEEN SUBJECT "[TA]")')
         if status != "OK":
             return []
 
