@@ -41,3 +41,6 @@ env/
 
 # Claude Code
 .claude/
+
+# Session notes
+session_notes*.md
